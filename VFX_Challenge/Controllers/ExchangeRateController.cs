@@ -9,7 +9,7 @@ namespace VFX_Challenge.Controllers
     public class ExchangeRateController : ControllerBase
     {
         private readonly IExchangeRateService _exchangeRateService;
-
+        private readonly ILogger<ExchangeRateController> _logger;
         public ExchangeRateController(IExchangeRateService exchangeRateService)
         {
             _exchangeRateService = exchangeRateService;
@@ -18,15 +18,22 @@ namespace VFX_Challenge.Controllers
         /// <summary>
         /// Obtém a taxa de câmbio de um par de moedas específico.
         /// </summary>
-        [HttpGet("{currencyPair}")]
-        public async Task<IActionResult> GetRate(string currencyPair)
+        [HttpGet("{BaseCurrency}/{QuoteCurrency}")]
+        public async Task<IActionResult> GetRate(string BaseCurrency, string QuoteCurrency)
         {
-            var rate = await _exchangeRateService.GetExchangeRateAsync(currencyPair);
-            if (rate == null)
+            try
             {
-                return NotFound(new { Message = $"Exchange rate for {currencyPair} not found." });
+                var rate = await _exchangeRateService.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                if (rate == null)
+                {
+                    return NotFound(new { Message = $"Exchange rate for {BaseCurrency}/{QuoteCurrency} not found." });
+                }
+                return Ok(rate);
             }
-            return Ok(rate);
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         /// <summary>
@@ -35,8 +42,15 @@ namespace VFX_Challenge.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ExchangeRate>>> GetAllRates()
         {
-            var rates = await _exchangeRateService.GetAllExchangeRatesAsync();
-            return Ok(rates);
+            try
+            {
+                var rates = await _exchangeRateService.GetAllExchangeRatesAsync();
+                return Ok(rates);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         /// <summary>
@@ -45,48 +59,69 @@ namespace VFX_Challenge.Controllers
         [HttpPost]
         public async Task<IActionResult> AddRate([FromBody] ExchangeRate rate)
         {
-            if (rate == null || string.IsNullOrEmpty(rate.CurrencyPair))
+            try
             {
-                return BadRequest(new { Message = "Invalid exchange rate data." });
-            }
+                if (rate == null || string.IsNullOrEmpty(rate.BaseCurrency))
+                {
+                    return BadRequest(new { Message = "Invalid exchange rate data." });
+                }
 
-            await _exchangeRateService.AddExchangeRateAsync(rate);
-            return CreatedAtAction(nameof(GetRate), new { currencyPair = rate.CurrencyPair }, rate);
+                await _exchangeRateService.AddExchangeRateAsync(rate);
+                return CreatedAtAction(nameof(GetRate), new { currencyPair = rate.BaseCurrency }, rate);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         /// <summary>
         /// Atualiza uma taxa de câmbio existente.
         /// </summary>
-        [HttpPut("{currencyPair}")]
-        public async Task<IActionResult> UpdateRate(string currencyPair, [FromBody] ExchangeRate updatedRate)
+        [HttpPut("{BaseCurrency}/{QuoteCurrency}")]
+        public async Task<IActionResult> UpdateRate(string BaseCurrency, string QuoteCurrency, [FromBody] ExchangeRate updatedRate)
         {
-            if (updatedRate == null || updatedRate.CurrencyPair != currencyPair)
+            try
             {
-                return BadRequest(new { Message = "Invalid exchange rate data." });
-            }
+                if (updatedRate == null || updatedRate.BaseCurrency != BaseCurrency)
+                {
+                    return BadRequest(new { Message = "Invalid exchange rate data." });
+                }
 
-            var result = await _exchangeRateService.UpdateExchangeRateAsync(currencyPair, updatedRate);
-            if (!result)
+                var result = await _exchangeRateService.UpdateExchangeRateAsync(BaseCurrency, QuoteCurrency, updatedRate);
+                if (!result)
+                {
+                    return NotFound(new { Message = $"Exchange rate for {BaseCurrency}/{QuoteCurrency} not found." });
+                }
+
+                return NoContent();
+            }
+            catch (Exception ex)
             {
-                return NotFound(new { Message = $"Exchange rate for {currencyPair} not found." });
+                return StatusCode(500, ex.Message);
             }
-
-            return NoContent();
         }
 
         /// <summary>
         /// Remove uma taxa de câmbio existente.
         /// </summary>
-        [HttpDelete("{currencyPair}")]
-        public async Task<IActionResult> DeleteRate(string currencyPair)
+        [HttpDelete("{BaseCurrency}/{QuoteCurrency}")]
+        public async Task<IActionResult> DeleteRate(string BaseCurrency, string QuoteCurrency)
         {
-            var result = await _exchangeRateService.DeleteExchangeRateAsync(currencyPair);
-            if (!result)
+            try
             {
-                return NotFound(new { Message = $"Exchange rate for {currencyPair} not found." });
-            }
+                var result = await _exchangeRateService.DeleteExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                if (!result)
+                {
+                    return NotFound(new { Message = $"Exchange rate for {BaseCurrency}/{QuoteCurrency} not found." });
+                }
 
-            return NoContent();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
     }
 }

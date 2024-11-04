@@ -3,18 +3,10 @@ using VFX_Challenge.Models;
 
 namespace VFX_Challenge.Repositories
 {
-    public interface IExchangeRateRepository
-    {
-        Task<ExchangeRate> GetExchangeRateAsync(string currencyPair);
-        Task<IEnumerable<ExchangeRate>> GetAllExchangeRatesAsync();
-        Task AddExchangeRateAsync(ExchangeRate rate);
-        Task UpdateExchangeRateAsync(ExchangeRate rate);
-        Task DeleteExchangeRateAsync(ExchangeRate rate);
-    }
-
     public class ExchangeRateRepository : IExchangeRateRepository
     {
         private readonly ExchangeRateDbContext _context;
+        private readonly ILogger<ExchangeRateRepository> _logger;
 
         public ExchangeRateRepository(ExchangeRateDbContext context)
         {
@@ -24,11 +16,19 @@ namespace VFX_Challenge.Repositories
         /// <summary>
         /// Obtém uma taxa de câmbio específica pelo par de moedas.
         /// </summary>
-        public async Task<ExchangeRate> GetExchangeRateAsync(string currencyPair)
+        public async Task<ExchangeRate> GetExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
-            return await _context.ExchangeRates
-                .AsNoTracking()
-                .FirstOrDefaultAsync(r => r.CurrencyPair == currencyPair);
+            try
+            {
+                return await _context.ExchangeRates
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.BaseCurrency == BaseCurrency && r.QuoteCurrency == QuoteCurrency);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);   
+                return null;
+            }
         }
 
         /// <summary>

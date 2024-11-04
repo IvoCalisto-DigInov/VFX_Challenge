@@ -1,25 +1,21 @@
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using VFX_Challenge.External;
 using VFX_Challenge.Repositories;
 using VFX_Challenge.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuração do DbContext com SQLite
+// Configuração do DbContext 
 builder.Services.AddDbContext<ExchangeRateDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("VFX_ChallengeDB")));
 
 // Registro dos serviços e repositórios
 builder.Services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 
 // Configuração do cliente HTTP para a API externa
-builder.Services.AddHttpClient<IExternalExchangeRateApi, ExternalExchangeRateApi>(client =>
-{
-    client.BaseAddress = new Uri("https://www.alphavantage.co/");
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-    // Adicione a chave da API nos cabeçalhos ou parâmetros de consulta, se necessário
-});
+builder.Services.AddHttpClient<IExternalExchangeRateApi, ExternalExchangeRateApi>();
 
 // Adiciona suporte a controladores
 builder.Services.AddControllers();
@@ -28,7 +24,21 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure Serilog using the settings from appsettings.json
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration) // Read configuration
+    .CreateLogger();
+
+builder.Host.UseSerilog(); // Use Serilog for logging
+
 var app = builder.Build();
+
+// Apply pending migrations at startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ExchangeRateDbContext>();
+    dbContext.Database.Migrate();
+}
 
 // Configuração do pipeline de middleware
 if (app.Environment.IsDevelopment())

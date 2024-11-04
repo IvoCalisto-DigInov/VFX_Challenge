@@ -2,22 +2,15 @@
 using VFX_Challenge.Models;
 using VFX_Challenge.Repositories;
 using VFX_Challenge.External;
+using VFX_Challenge.Controllers;
 
 namespace VFX_Challenge.Services
 {
-    public interface IExchangeRateService
-    {
-        Task<ExchangeRate> GetExchangeRateAsync(string currencyPair);
-        Task<IEnumerable<ExchangeRate>> GetAllExchangeRatesAsync();
-        Task AddExchangeRateAsync(ExchangeRate rate);
-        Task<bool> UpdateExchangeRateAsync(string currencyPair, ExchangeRate updatedRate);
-        Task<bool> DeleteExchangeRateAsync(string currencyPair);
-    }
-
     public class ExchangeRateService : IExchangeRateService
     {
         private readonly IExchangeRateRepository _repository;
         private readonly IExternalExchangeRateApi _externalApi;
+        private readonly ILogger<ExchangeRateService> _logger;
 
         public ExchangeRateService(IExchangeRateRepository repository, IExternalExchangeRateApi externalApi)
         {
@@ -29,14 +22,14 @@ namespace VFX_Challenge.Services
         /// Obtém a taxa de câmbio de um par de moedas específico.
         /// Se não estiver no banco de dados, busca na API externa e armazena.
         /// </summary>
-        public async Task<ExchangeRate> GetExchangeRateAsync(string currencyPair)
+        public async Task<ExchangeRate> GetExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
             // Verifica se a taxa está no banco de dados
-            var rate = await _repository.GetExchangeRateAsync(currencyPair);
+            var rate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
             if (rate == null)
             {
                 // Busca a taxa na API externa
-                rate = await _externalApi.FetchExchangeRateAsync(currencyPair);
+                rate = await _externalApi.FetchExchangeRateAsync(BaseCurrency, QuoteCurrency);
                 if (rate != null)
                 {
                     // Armazena no banco de dados se a taxa foi obtida da API externa
@@ -66,9 +59,9 @@ namespace VFX_Challenge.Services
         /// <summary>
         /// Atualiza uma taxa de câmbio existente no banco de dados.
         /// </summary>
-        public async Task<bool> UpdateExchangeRateAsync(string currencyPair, ExchangeRate updatedRate)
+        public async Task<bool> UpdateExchangeRateAsync(string BaseCurrency, string QuoteCurrency, ExchangeRate updatedRate)
         {
-            var existingRate = await _repository.GetExchangeRateAsync(currencyPair);
+            var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
             if (existingRate == null)
             {
                 return false;
@@ -85,9 +78,9 @@ namespace VFX_Challenge.Services
         /// <summary>
         /// Remove uma taxa de câmbio do banco de dados.
         /// </summary>
-        public async Task<bool> DeleteExchangeRateAsync(string currencyPair)
+        public async Task<bool> DeleteExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
-            var existingRate = await _repository.GetExchangeRateAsync(currencyPair);
+            var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
             if (existingRate == null)
             {
                 return false;
