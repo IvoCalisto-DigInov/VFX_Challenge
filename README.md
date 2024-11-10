@@ -19,7 +19,7 @@ This application provides an API to fetch and manage currency exchange rates. It
 
 1. **Clone the Repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/IvoCalisto-DigInov/VFX_Challenge.git
    cd VFX_Challenge
    ```
 
@@ -30,18 +30,12 @@ This application provides an API to fetch and manage currency exchange rates. It
    - If using a SQL Server instance:
      - Open `appsettings.json` and configure the connection string under `ConnectionStrings`.
    - If using an in-memory database (for testing only):
-     - Update the `Startup.cs` file to use an in-memory database instead of SQL Server.
+     - Update the `Program.cs` file to use an in-memory database instead of SQL Server.
 
-4. **Run Database Migrations**
-   - In Visual Studio’s **Package Manager Console**, navigate to the project directory and run:
-     ```bash
-     Update-Database
-     ```
-
-5. **Run the Application**
+4. **Run the Application**
    - Press `F5` or select **Start Debugging** in Visual Studio to launch the API. It should run at `https://localhost:5001` or a similar local port.
 
-6. **Test the API**
+5. **Test the API**
    - Use tools like **Postman** or a web browser to test the API endpoints, such as:
      ```
      GET https://localhost:5001/api/exchangerate/USD/EUR
