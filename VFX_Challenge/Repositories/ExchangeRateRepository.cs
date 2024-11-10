@@ -8,16 +8,21 @@ namespace VFX_Challenge.Repositories
         private readonly ExchangeRateDbContext _context;
         private readonly ILogger<ExchangeRateRepository> _logger;
 
-        public ExchangeRateRepository(ExchangeRateDbContext context)
+        public ExchangeRateRepository(ExchangeRateDbContext context, ILogger<ExchangeRateRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         /// <summary>
-        /// Obtém uma taxa de câmbio específica pelo par de moedas.
+        /// Retrieves a specific exchange rate by currency pair from the database.
         /// </summary>
+        /// <param name="BaseCurrency">The base currency code (e.g., USD).</param>
+        /// <param name="QuoteCurrency">The quote currency code (e.g., EUR).</param>
+        /// <returns>Returns the exchange rate if found, otherwise null.</returns>
         public async Task<ExchangeRate> GetExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
+            _logger.LogInformation("Querying database for exchange rate: {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
             try
             {
                 return await _context.ExchangeRates
@@ -26,46 +31,95 @@ namespace VFX_Challenge.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.Message);   
+                _logger.LogError(ex, "Error occurred while retrieving exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
                 return null;
             }
         }
 
         /// <summary>
-        /// Obtém todas as taxas de câmbio armazenadas.
+        /// Retrieves all stored exchange rates from the database.
         /// </summary>
+        /// <returns>Returns a list of all exchange rates, or null if an error occurs.</returns>
         public async Task<IEnumerable<ExchangeRate>> GetAllExchangeRatesAsync()
         {
-            return await _context.ExchangeRates
-                .AsNoTracking()
-                .ToListAsync();
+            _logger.LogInformation("Retrieving all exchange rates from the database.");
+            try
+            {
+                return await _context.ExchangeRates
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while retrieving all exchange rates.");
+                return null;
+            }
         }
 
         /// <summary>
-        /// Adiciona uma nova taxa de câmbio ao banco de dados.
+        /// Adds a new exchange rate to the database.
         /// </summary>
-        public async Task AddExchangeRateAsync(ExchangeRate rate)
+        /// <param name="rate">The exchange rate object to add.</param>
+        /// <returns>Returns true if the rate was added successfully, otherwise false.</returns>
+        public async Task<bool> AddExchangeRateAsync(ExchangeRate rate)
         {
-            _context.ExchangeRates.Add(rate);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Adding new exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+            try
+            {
+                _context.ExchangeRates.Add(rate);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Exchange rate added successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while adding exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+                return false;
+            }
         }
 
         /// <summary>
-        /// Atualiza uma taxa de câmbio existente no banco de dados.
+        /// Updates an existing exchange rate in the database.
         /// </summary>
-        public async Task UpdateExchangeRateAsync(ExchangeRate rate)
+        /// <param name="rate">The exchange rate object with updated information.</param>
+        /// <returns>Returns true if the rate was updated successfully, otherwise false.</returns>
+        public async Task<bool> UpdateExchangeRateAsync(ExchangeRate rate)
         {
-            _context.ExchangeRates.Update(rate);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updating exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+            try
+            {
+                _context.ExchangeRates.Update(rate);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Exchange rate updated successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+                return false;
+            }
         }
 
         /// <summary>
-        /// Remove uma taxa de câmbio do banco de dados.
+        /// Deletes an exchange rate from the database.
         /// </summary>
-        public async Task DeleteExchangeRateAsync(ExchangeRate rate)
+        /// <param name="rate">The exchange rate object to delete.</param>
+        /// <returns>Returns true if the rate was deleted successfully, otherwise false.</returns>
+        public async Task<bool> DeleteExchangeRateAsync(ExchangeRate rate)
         {
-            _context.ExchangeRates.Remove(rate);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Deleting exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+            try
+            {
+                _context.ExchangeRates.Remove(rate);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Exchange rate deleted successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while deleting exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+                return false;
+            }
         }
     }
 }

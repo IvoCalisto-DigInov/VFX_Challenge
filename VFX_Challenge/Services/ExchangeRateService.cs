@@ -1,8 +1,9 @@
-﻿
-using VFX_Challenge.Models;
+﻿using VFX_Challenge.Models;
 using VFX_Challenge.Repositories;
 using VFX_Challenge.External;
-using VFX_Challenge.Controllers;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace VFX_Challenge.Services
 {
@@ -12,82 +13,149 @@ namespace VFX_Challenge.Services
         private readonly IExternalExchangeRateApi _externalApi;
         private readonly ILogger<ExchangeRateService> _logger;
 
-        public ExchangeRateService(IExchangeRateRepository repository, IExternalExchangeRateApi externalApi)
+        public ExchangeRateService(IExchangeRateRepository repository, IExternalExchangeRateApi externalApi, ILogger<ExchangeRateService> logger)
         {
             _repository = repository;
             _externalApi = externalApi;
+            _logger = logger;
         }
 
         /// <summary>
-        /// Obtém a taxa de câmbio de um par de moedas específico.
-        /// Se não estiver no banco de dados, busca na API externa e armazena.
+        /// Retrieves the exchange rate for a specific currency pair.
+        /// Checks the database first; if not found, fetches from an external API and stores it.
         /// </summary>
+        /// <param name="BaseCurrency">The base currency code (e.g., USD).</param>
+        /// <param name="QuoteCurrency">The quote currency code (e.g., EUR).</param>
+        /// <returns>Returns the exchange rate object, or null if not found.</returns>
         public async Task<ExchangeRate> GetExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
-            // Verifica se a taxa está no banco de dados
-            var rate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
-            if (rate == null)
+            _logger.LogInformation("Attempting to retrieve exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
+            try
             {
-                // Busca a taxa na API externa
-                rate = await _externalApi.FetchExchangeRateAsync(BaseCurrency, QuoteCurrency);
-                if (rate != null)
+                // Check if the rate is in the database
+                var rate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                if (rate == null)
                 {
-                    // Armazena no banco de dados se a taxa foi obtida da API externa
-                    await _repository.AddExchangeRateAsync(rate);
+                    _logger.LogInformation("Exchange rate not found in database. Fetching from external API.");
+                    // Fetch from external API if not in database
+                    rate = await _externalApi.FetchExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                    if (rate != null)
+                    {
+                        _logger.LogInformation("Exchange rate fetched from external API. Storing in database.");
+                        await _repository.AddExchangeRateAsync(rate);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to retrieve exchange rate for {BaseCurrency}/{QuoteCurrency} from external API.", BaseCurrency, QuoteCurrency);
+                    }
                 }
+                return rate;
             }
-            return rate;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while retrieving exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
+                return null;
+            }
         }
 
         /// <summary>
-        /// Obtém todas as taxas de câmbio disponíveis no banco de dados.
+        /// Retrieves all available exchange rates from the database.
         /// </summary>
+        /// <returns>Returns a list of all exchange rates, or null if an error occurs.</returns>
         public async Task<IEnumerable<ExchangeRate>> GetAllExchangeRatesAsync()
         {
-            return await _repository.GetAllExchangeRatesAsync();
+            _logger.LogInformation("Attempting to retrieve all exchange rates from the database.");
+            try
+            {
+                return await _repository.GetAllExchangeRatesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while retrieving all exchange rates.");
+                return null;
+            }
         }
 
         /// <summary>
-        /// Adiciona uma nova taxa de câmbio ao banco de dados.
+        /// Adds a new exchange rate to the database.
         /// </summary>
-        public async Task AddExchangeRateAsync(ExchangeRate rate)
+        /// <param name="rate">The exchange rate object to be added.</param>
+        /// <returns>Returns true if the rate was added successfully, false otherwise.</returns>
+        public async Task<bool> AddExchangeRateAsync(ExchangeRate rate)
         {
-            await _repository.AddExchangeRateAsync(rate);
-            // Adicione aqui a lógica para disparar um evento, se necessário
+            _logger.LogInformation("Attempting to add a new exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+            try
+            {
+                return await _repository.AddExchangeRateAsync(rate);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while adding exchange rate for {BaseCurrency}/{QuoteCurrency}", rate.BaseCurrency, rate.QuoteCurrency);
+                return false;
+            }
         }
 
         /// <summary>
-        /// Atualiza uma taxa de câmbio existente no banco de dados.
+        /// Updates an existing exchange rate in the database.
         /// </summary>
+        /// <param name="BaseCurrency">The base currency of the rate to update.</param>
+        /// <param name="QuoteCurrency">The quote currency of the rate to update.</param>
+        /// <param name="updatedRate">The updated exchange rate details.</param>
+        /// <returns>Returns true if the rate was updated successfully, false otherwise.</returns>
         public async Task<bool> UpdateExchangeRateAsync(string BaseCurrency, string QuoteCurrency, ExchangeRate updatedRate)
         {
-            var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
-            if (existingRate == null)
+            _logger.LogInformation("Attempting to update exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
+            try
             {
+                var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                if (existingRate == null)
+                {
+                    _logger.LogWarning("Exchange rate for {BaseCurrency}/{QuoteCurrency} not found for update.", BaseCurrency, QuoteCurrency);
+                    return false;
+                }
+
+                // Update bid and ask values
+                existingRate.Bid = updatedRate.Bid;
+                existingRate.Ask = updatedRate.Ask;
+
+                await _repository.UpdateExchangeRateAsync(existingRate);
+                _logger.LogInformation("Exchange rate for {BaseCurrency}/{QuoteCurrency} updated successfully.", BaseCurrency, QuoteCurrency);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
                 return false;
             }
-
-            // Atualiza os valores do bid e ask
-            existingRate.Bid = updatedRate.Bid;
-            existingRate.Ask = updatedRate.Ask;
-
-            await _repository.UpdateExchangeRateAsync(existingRate);
-            return true;
         }
 
         /// <summary>
-        /// Remove uma taxa de câmbio do banco de dados.
+        /// Removes an exchange rate from the database.
         /// </summary>
+        /// <param name="BaseCurrency">The base currency of the rate to delete.</param>
+        /// <param name="QuoteCurrency">The quote currency of the rate to delete.</param>
+        /// <returns>Returns true if the rate was deleted successfully, false otherwise.</returns>
         public async Task<bool> DeleteExchangeRateAsync(string BaseCurrency, string QuoteCurrency)
         {
-            var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
-            if (existingRate == null)
+            _logger.LogInformation("Attempting to delete exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
+            try
             {
+                var existingRate = await _repository.GetExchangeRateAsync(BaseCurrency, QuoteCurrency);
+                if (existingRate == null)
+                {
+                    _logger.LogWarning("Exchange rate for {BaseCurrency}/{QuoteCurrency} not found for deletion.", BaseCurrency, QuoteCurrency);
+                    return false;
+                }
+
+                await _repository.DeleteExchangeRateAsync(existingRate);
+                _logger.LogInformation("Exchange rate for {BaseCurrency}/{QuoteCurrency} deleted successfully.", BaseCurrency, QuoteCurrency);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while deleting exchange rate for {BaseCurrency}/{QuoteCurrency}", BaseCurrency, QuoteCurrency);
                 return false;
             }
-
-            await _repository.DeleteExchangeRateAsync(existingRate);
-            return true;
         }
     }
 }

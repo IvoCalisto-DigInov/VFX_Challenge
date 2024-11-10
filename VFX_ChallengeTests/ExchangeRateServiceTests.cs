@@ -1,49 +1,66 @@
+using Microsoft.Extensions.Logging;
 using Moq;
 using VFX_Challenge.External;
+using VFX_Challenge.Models;
 using VFX_Challenge.Repositories;
 using VFX_Challenge.Services;
-
-public class ExchangeRateServiceTests
+namespace VFX_ChallengeTests
 {
-    private readonly ExchangeRateService _service;
-    private readonly Mock<IExchangeRateRepository> _repositoryMock;
-    private readonly Mock<IExternalExchangeRateApi> _externalApiMock;
-
-    public ExchangeRateServiceTests()
+    public class ExchangeRateServiceTests
     {
-        _repositoryMock = new Mock<IExchangeRateRepository>();
-        _externalApiMock = new Mock<IExternalExchangeRateApi>();
-        _service = new ExchangeRateService(_repositoryMock.Object, _externalApiMock.Object);
-    }
+        private readonly Mock<IExchangeRateRepository> _repositoryMock;
+        private readonly Mock<IExternalExchangeRateApi> _externalApiMock;
+        private readonly Mock<ILogger<ExchangeRateService>> _loggerMock;
+        private readonly ExchangeRateService _service;
 
-    [Fact]
-    public async Task GetExchangeRateAsync_ReturnsCorrectRate()
-    {
-        //// Arrange
-        //decimal mockRate = 1.25m;
-        //_externalApiMock.Setup(api => api.GetExchangeRateAsync("USD", "EUR"))
-        //                .ReturnsAsync(mockRate);
+        public ExchangeRateServiceTests()
+        {
+            _repositoryMock = new Mock<IExchangeRateRepository>();
+            _externalApiMock = new Mock<IExternalExchangeRateApi>();
+            _loggerMock = new Mock<ILogger<ExchangeRateService>>();
+            _service = new ExchangeRateService(_repositoryMock.Object, _externalApiMock.Object, _loggerMock.Object);
+        }
 
-        //// Act
-        //var result = await _service.GetExchangeRateAsync("USD", "EUR");
+        [Fact]
+        public async Task GetExchangeRateAsync_ReturnsRateFromDatabase()
+        {
+            var expectedRate = new ExchangeRate { BaseCurrency = "USD", QuoteCurrency = "EUR", Bid = 0.85M };
+            _repositoryMock.Setup(repo => repo.GetExchangeRateAsync("USD", "EUR")).ReturnsAsync(expectedRate);
 
-        //// Assert
-        //Assert.Equal(mockRate, result);
-    }
+            var result = await _service.GetExchangeRateAsync("USD", "EUR");
 
-    [Fact]
-    public async Task GetExchangeRateAsync_UsesCacheWhenAvailable()
-    {
-        //// Arrange
-        //decimal cachedRate = 1.20m;
-        //_repositoryMock.Setup(repo => repo.GetCachedRateAsync("USD", "EUR"))
-        //               .ReturnsAsync(cachedRate);
+            Assert.Equal(expectedRate, result);
+            _repositoryMock.Verify(repo => repo.GetExchangeRateAsync("USD", "EUR"), Times.Once);
+            //_externalApiMock.Verify(api => api.GetExchangeRateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
 
-        //// Act
-        //var result = await _service.GetExchangeRateAsync("USD", "EUR");
+        [Fact]
+        public async Task GetExchangeRateAsync_FetchesFromExternalApi_WhenNotInDatabase()
+        {
+            _repositoryMock.Setup(repo => repo.GetExchangeRateAsync("USD", "EUR")).ReturnsAsync((ExchangeRate)null);
+            var expectedRate = new ExchangeRate { BaseCurrency = "USD", QuoteCurrency = "EUR", Bid = 0.85M };
+            //_externalApiMock.Setup(api => api.GetExchangeRateAsync("USD", "EUR")).ReturnsAsync(expectedRate);
 
-        //// Assert
-        //Assert.Equal(cachedRate, result);
-        //_externalApiMock.Verify(api => api.GetExchangeRateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            var result = await _service.GetExchangeRateAsync("USD", "EUR");
+
+            Assert.Equal(expectedRate, result);
+            _repositoryMock.Verify(repo => repo.GetExchangeRateAsync("USD", "EUR"), Times.Once);
+            //_externalApiMock.Verify(api => api.GetExchangeRateAsync("USD", "EUR"), Times.Once);
+            _repositoryMock.Verify(repo => repo.AddExchangeRateAsync(expectedRate), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetExchangeRateAsync_ReturnsNull_WhenNotFoundInDatabaseOrApi()
+        {
+            _repositoryMock.Setup(repo => repo.GetExchangeRateAsync("USD", "EUR")).ReturnsAsync((ExchangeRate)null);
+            //_externalApiMock.Setup(api => api.GetExchangeRateAsync("USD", "EUR")).ReturnsAsync((ExchangeRate)null);
+
+            var result = await _service.GetExchangeRateAsync("USD", "EUR");
+
+            Assert.Null(result);
+            _repositoryMock.Verify(repo => repo.GetExchangeRateAsync("USD", "EUR"), Times.Once);
+            //_externalApiMock.Verify(api => api.GetExchangeRateAsync("USD", "EUR"), Times.Once);
+            _repositoryMock.Verify(repo => repo.AddExchangeRateAsync(It.IsAny<ExchangeRate>()), Times.Never);
+        }
     }
 }

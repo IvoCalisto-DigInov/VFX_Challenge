@@ -6,8 +6,8 @@ namespace VFX_Challenge.Repositories
     {
         Task<ExchangeRate> GetExchangeRateAsync(string BaseCurrency, string QuoteCurrency);
         Task<IEnumerable<ExchangeRate>> GetAllExchangeRatesAsync();
-        Task AddExchangeRateAsync(ExchangeRate rate);
-        Task UpdateExchangeRateAsync(ExchangeRate rate);
-        Task DeleteExchangeRateAsync(ExchangeRate rate);
+        Task<bool> AddExchangeRateAsync(ExchangeRate rate);
+        Task<bool> UpdateExchangeRateAsync(ExchangeRate rate);
+        Task<bool> DeleteExchangeRateAsync(ExchangeRate rate);
     }
 }

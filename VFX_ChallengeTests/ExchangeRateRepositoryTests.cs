@@ -1,45 +1,36 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Moq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using VFX_Challenge.Models;
 using VFX_Challenge.Repositories;
+using Xunit;
+
 namespace VFX_ChallengeTests
 {
     public class ExchangeRateRepositoryTests
     {
-        private readonly ExchangeRateDbContext _context;
+        private readonly Mock<ExchangeRateDbContext> _contextMock;
+        private readonly Mock<ILogger<ExchangeRateRepository>> _loggerMock;
         private readonly ExchangeRateRepository _repository;
 
         public ExchangeRateRepositoryTests()
         {
-            var options = new DbContextOptionsBuilder<ExchangeRateDbContext>()
-                            .UseInMemoryDatabase(databaseName: "TestDb")
-                            .Options;
-            _context = new ExchangeRateDbContext(options);
-            _repository = new ExchangeRateRepository(_context);
+            _contextMock = new Mock<ExchangeRateDbContext>();
+            _loggerMock = new Mock<ILogger<ExchangeRateRepository>>();
+            _repository = new ExchangeRateRepository(_contextMock.Object, _loggerMock.Object);
         }
 
         [Fact]
-        public async Task SaveRateAsync_SavesRateCorrectly()
+        public async Task GetExchangeRateAsync_ReturnsRateFromDatabase()
         {
-            // Arrange
-            //var rate = new ExchangeRate { BaseCurrency = "USD", CurrencyTo = "EUR", Rate = 1.25m };
+            var expectedRate = new ExchangeRate { BaseCurrency = "USD", QuoteCurrency = "EUR", Bid = 0.85M };
+            _contextMock.Setup(ctx => ctx.ExchangeRates.FindAsync("USD", "EUR")).ReturnsAsync(expectedRate);
 
-            //// Act
-            //await _repository.SaveRateAsync(rate);
-            //var savedRate = await _repository.GetCachedRateAsync("USD", "EUR");
+            var result = await _repository.GetExchangeRateAsync("USD", "EUR");
 
-            //// Assert
-            //Assert.NotNull(savedRate);
-            //Assert.Equal(1.25m, savedRate.Rate);
-        }
-
-        [Fact]
-        public async Task GetCachedRateAsync_ReturnsNullIfRateNotFound()
-        {
-            // Act
-            //var result = await _repository.GetCachedRateAsync("USD", "JPY");
-
-            //Assert
-            //Assert.Null(result);
+            Assert.Equal(expectedRate, result);
+            _contextMock.Verify(ctx => ctx.ExchangeRates.FindAsync("USD", "EUR"), Times.Once);
         }
     }
 }
