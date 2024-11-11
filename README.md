@@ -107,5 +107,6 @@ This application provides an API to fetch and manage currency exchange rates. It
 3. **Retry mechanism for external API**: Add retries with exponential backoff when calls to the external API fail;
 4. **Enhanced security**: Implement API key or OAuth for securing access to endpoints, especially in production;
 5. **Logging enhancements**: Use a centralized logging service (like Azure Monitor or AWS CloudWatch) for monitoring across environments.
+6. **Message Queue System**: Introduce a message queue, such as RabbitMQ, Azure Queue Storage, or Azure Service Bus, to enable event-driven architecture. Publish events to the queue whenever a new exchange rate is added, allowing other services to respond asynchronously.
 
 ---
